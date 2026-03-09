@@ -1,0 +1,36 @@
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <i class="fas fa-bell"></i>
+    <span>PushNotify</span>
+  </div>
+  <nav class="sidebar-nav">
+    <% if (user && user.role === 'admin') { %>
+      <a href="/admin/dashboard" class="nav-link <%= title === 'Admin Dashboard' ? 'active' : '' %>">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+      </a>
+      <a href="/admin/users" class="nav-link <%= ['Manage Users'].includes(title) ? 'active' : '' %>">
+        <i class="fas fa-users"></i> Users
+      </a>
+      <a href="/admin/send-notification" class="nav-link <%= title === 'Send Notification' ? 'active' : '' %>">
+        <i class="fas fa-paper-plane"></i> Send Notification
+      </a>
+      <a href="/admin/notifications" class="nav-link <%= title === 'Notification History' ? 'active' : '' %>">
+        <i class="fas fa-history"></i> History
+      </a>
+    <% } else { %>
+      <a href="/user/dashboard" class="nav-link active">
+        <i class="fas fa-home"></i> Dashboard
+      </a>
+    <% } %>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="user-avatar"><%= user ? user.name.charAt(0).toUpperCase() : 'U' %></div>
+      <div>
+        <div class="user-name"><%= user ? user.name : '' %></div>
+        <div class="user-role"><%= user ? user.role : '' %></div>
+      </div>
+    </div>
+    <a href="/auth/logout" class="logout-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+  </div>
+</div>

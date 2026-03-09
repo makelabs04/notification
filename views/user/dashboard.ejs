@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title><%= title %> | PushNotify</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/topbar') %>
+  <div class="page-body">
+    <%- include('../partials/flash') %>
+
+    <!-- Push Notification Permission Banner -->
+    <div id="permissionBanner" class="permission-banner" style="display:none">
+      <div class="permission-banner-icon"><i class="fas fa-bell"></i></div>
+      <div class="permission-banner-content">
+        <strong>Enable Push Notifications</strong>
+        <p>Stay updated with the latest news and alerts. Allow notifications to receive real-time updates.</p>
+      </div>
+      <div class="permission-banner-actions">
+        <button class="btn btn-primary" onclick="requestPermission()">
+          <i class="fas fa-bell"></i> Allow Notifications
+        </button>
+        <button class="btn btn-outline" onclick="dismissBanner()">
+          Not Now
+        </button>
+      </div>
+    </div>
+
+    <!-- Already subscribed notice -->
+    <div id="subscribedNotice" class="subscribed-notice" style="display:none">
+      <i class="fas fa-check-circle"></i>
+      <span>You're subscribed to push notifications!</span>
+      <button class="btn btn-outline btn-sm" onclick="unsubscribe()">Unsubscribe</button>
+    </div>
+
+    <!-- Welcome Card -->
+    <div class="user-welcome-grid">
+      <div class="card welcome-card">
+        <div class="welcome-avatar"><%= user.name.charAt(0).toUpperCase() %></div>
+        <div class="welcome-info">
+          <h2>Welcome back, <%= user.name %>! 👋</h2>
+          <p><%= user.email %></p>
+          <div id="notifStatus" class="notif-status-badge">
+            <span id="statusIcon"><i class="fas fa-spinner fa-spin"></i></span>
+            <span id="statusText">Checking notification status...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-cog"></i> Notification Settings</h3></div>
+        <div class="card-body">
+          <div class="setting-row">
+            <div>
+              <strong>Push Notifications</strong>
+              <p>Receive browser alerts when admin sends updates</p>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="pushToggle" onchange="handleToggle(this)"/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div id="permissionNote" class="permission-note" style="display:none">
+            <i class="fas fa-info-circle"></i>
+            <span id="permissionNoteText"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="info-grid mt-4">
+      <div class="card text-center">
+        <div class="info-icon" style="background:#e3f6ff;color:#00adee"><i class="fas fa-bell"></i></div>
+        <h4>Real-time Alerts</h4>
+        <p>Get instant notifications even when the tab is closed</p>
+      </div>
+      <div class="card text-center">
+        <div class="info-icon" style="background:#e8f5e9;color:#4caf50"><i class="fas fa-shield-alt"></i></div>
+        <h4>Privacy First</h4>
+        <p>You can unsubscribe at any time from settings</p>
+      </div>
+      <div class="card text-center">
+        <div class="info-icon" style="background:#fff3e0;color:#ff9800"><i class="fas fa-mobile-alt"></i></div>
+        <h4>Works Everywhere</h4>
+        <p>Notifications work across Chrome, Edge & Firefox</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const VAPID_PUBLIC_KEY = '<%= vapidPublicKey %>';
+  const hasDbSubscription = <%= hasSubscription %>;
+
+  let swRegistration = null;
+  let pushSubscription = null;
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  async function initServiceWorker() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      updateStatus(false, '❌ Push notifications not supported in this browser.');
+      return;
+    }
+
+    try {
+      swRegistration = await navigator.serviceWorker.register('/sw.js');
+      pushSubscription = await swRegistration.pushManager.getSubscription();
+
+      const permission = Notification.permission;
+
+      if (pushSubscription && permission === 'granted') {
+        // Already subscribed
+        updateStatus(true, '🔔 Push notifications are enabled.');
+        document.getElementById('pushToggle').checked = true;
+        document.getElementById('subscribedNotice').style.display = 'flex';
+      } else if (permission === 'denied') {
+        updateStatus(false, '🚫 Notifications blocked. Please allow in browser settings.');
+        showPermissionNote('Notifications are blocked in your browser. Click the 🔒 icon in the address bar to allow.');
+      } else if (!hasDbSubscription && permission !== 'denied') {
+        // Show banner for first-time users
+        setTimeout(() => {
+          document.getElementById('permissionBanner').style.display = 'flex';
+        }, 1000);
+        updateStatus(false, '🔕 Push notifications are disabled.');
+      } else {
+        updateStatus(false, '🔕 Push notifications are disabled.');
+      }
+    } catch (err) {
+      console.error('SW init error:', err);
+      updateStatus(false, 'Service worker failed to load.');
+    }
+  }
+
+  function updateStatus(active, text) {
+    const badge = document.getElementById('notifStatus');
+    document.getElementById('statusText').textContent = text;
+    badge.className = 'notif-status-badge ' + (active ? 'status-active' : 'status-inactive');
+    document.getElementById('statusIcon').innerHTML = active
+      ? '<i class="fas fa-bell"></i>'
+      : '<i class="fas fa-bell-slash"></i>';
+  }
+
+  function showPermissionNote(text) {
+    const note = document.getElementById('permissionNote');
+    document.getElementById('permissionNoteText').textContent = text;
+    note.style.display = 'flex';
+  }
+
+  async function requestPermission() {
+    try {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') {
+        await subscribe();
+        dismissBanner();
+      } else if (result === 'denied') {
+        dismissBanner();
+        updateStatus(false, '🚫 Notification permission denied.');
+        showPermissionNote('You blocked notifications. To re-enable, click the lock icon in your browser address bar.');
+      }
+    } catch (err) {
+      console.error('Permission request error:', err);
+    }
+  }
+
+  async function subscribe() {
+    try {
+      if (!swRegistration) return;
+
+      pushSubscription = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+
+      const browser = navigator.userAgent.includes('Chrome') ? 'Chrome'
+        : navigator.userAgent.includes('Firefox') ? 'Firefox'
+        : navigator.userAgent.includes('Edge') ? 'Edge' : 'Other';
+
+      const res = await fetch('/user/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: pushSubscription, browser })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        updateStatus(true, '🔔 Push notifications are enabled.');
+        document.getElementById('pushToggle').checked = true;
+        document.getElementById('subscribedNotice').style.display = 'flex';
+        showToast('✅ Notifications enabled!', 'success');
+      }
+    } catch (err) {
+      console.error('Subscribe error:', err);
+      showToast('Failed to subscribe. Try again.', 'error');
+    }
+  }
+
+  async function unsubscribe() {
+    try {
+      if (pushSubscription) {
+        const endpoint = pushSubscription.endpoint;
+        await pushSubscription.unsubscribe();
+        pushSubscription = null;
+
+        await fetch('/user/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint })
+        });
+      } else {
+        await fetch('/user/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+      }
+
+      updateStatus(false, '🔕 Push notifications are disabled.');
+      document.getElementById('pushToggle').checked = false;
+      document.getElementById('subscribedNotice').style.display = 'none';
+      showToast('Unsubscribed from notifications.', 'info');
+    } catch (err) {
+      console.error('Unsubscribe error:', err);
+      showToast('Failed to unsubscribe. Try again.', 'error');
+    }
+  }
+
+  async function handleToggle(el) {
+    if (el.checked) {
+      if (Notification.permission === 'denied') {
+        el.checked = false;
+        showPermissionNote('Notifications blocked. Allow them from browser settings (🔒 icon).');
+        return;
+      }
+      if (Notification.permission === 'default') {
+        await requestPermission();
+      } else {
+        await subscribe();
+      }
+    } else {
+      await unsubscribe();
+    }
+  }
+
+  function dismissBanner() {
+    document.getElementById('permissionBanner').style.display = 'none';
+    sessionStorage.setItem('bannerDismissed', '1');
+  }
+
+  function showToast(msg, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.classList.add('show'), 100);
+    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3500);
+  }
+
+  // Init
+  window.addEventListener('load', initServiceWorker);
+</script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title><%= title %> | PushNotify</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<%- include('../partials/sidebar') %>
+<div class="main-content">
+  <%- include('../partials/topbar') %>
+  <div class="page-body">
+    <%- include('../partials/flash') %>
+
+    <div class="send-notif-grid">
+      <!-- Send Form -->
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fas fa-paper-plane"></i> Compose Notification</h3>
+        </div>
+        <div class="card-body">
+          <form action="/admin/send-notification" method="POST" id="notifForm">
+
+            <!-- Send Type -->
+            <div class="form-group">
+              <label class="form-label">Send To</label>
+              <div class="send-type-tabs">
+                <label class="send-type-tab">
+                  <input type="radio" name="send_type" value="all" id="typeAll"
+                    <%= !query_type || query_type === 'all' ? 'checked' : '' %> onchange="handleTypeChange()"/>
+                  <span><i class="fas fa-globe"></i> All Users</span>
+                </label>
+                <label class="send-type-tab">
+                  <input type="radio" name="send_type" value="individual" id="typeIndividual"
+                    <%= query_type === 'individual' ? 'checked' : '' %> onchange="handleTypeChange()"/>
+                  <span><i class="fas fa-user"></i> Individual</span>
+                </label>
+                <label class="send-type-tab">
+                  <input type="radio" name="send_type" value="selected" id="typeSelected"
+                    <%= query_type === 'selected' ? 'checked' : '' %> onchange="handleTypeChange()"/>
+                  <span><i class="fas fa-users"></i> Selected</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Individual User Select -->
+            <div class="form-group" id="individualGroup" style="display:none">
+              <label class="form-label">Select User</label>
+              <select name="user_ids" class="form-control" id="individualSelect">
+                <option value="">-- Choose a user --</option>
+                <% users.forEach(u => { %>
+                  <option value="<%= u.id %>" <%= query_user_id == u.id ? 'selected' : '' %>>
+                    <%= u.name %> (<%= u.email %>)
+                    <%= u.has_subscription > 0 ? '🔔' : '🔕' %>
+                  </option>
+                <% }) %>
+              </select>
+            </div>
+
+            <!-- Multiple Users Select -->
+            <div class="form-group" id="selectedGroup" style="display:none">
+              <label class="form-label">Select Users <small>(hold Ctrl/Cmd to select multiple)</small></label>
+              <div class="user-checkbox-list" id="userCheckboxList">
+                <% users.forEach(u => { %>
+                  <label class="user-checkbox-item <%= u.has_subscription > 0 ? '' : 'no-sub' %>">
+                    <input type="checkbox" name="user_ids" value="<%= u.id %>"/>
+                    <div class="mini-avatar"><%= u.name.charAt(0) %></div>
+                    <div>
+                      <strong><%= u.name %></strong>
+                      <small><%= u.email %></small>
+                    </div>
+                    <span class="sub-badge"><%= u.has_subscription > 0 ? '🔔' : '🔕' %></span>
+                  </label>
+                <% }) %>
+              </div>
+              <div class="select-all-row">
+                <button type="button" class="btn-link" onclick="selectAll()">Select All</button>
+                <button type="button" class="btn-link" onclick="selectNone()">Clear</button>
+                <button type="button" class="btn-link" onclick="selectSubscribed()">Subscribed Only</button>
+              </div>
+            </div>
+
+            <!-- Notification Fields -->
+            <div class="form-group">
+              <label class="form-label">Notification Title *</label>
+              <input type="text" name="title" class="form-control" placeholder="e.g. New Update Available" required maxlength="100"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Message Body *</label>
+              <textarea name="body" class="form-control" rows="4" placeholder="Write your notification message here..." required maxlength="255"></textarea>
+              <small class="form-hint">Max 255 characters</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Click URL <small>(optional)</small></label>
+              <input type="url" name="url" class="form-control" placeholder="https://yoursite.com/page" value="/"/>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="submitBtn">
+              <i class="fas fa-paper-plane"></i> Send Notification
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <h3><i class="fas fa-eye"></i> Live Preview</h3>
+          </div>
+          <div class="card-body">
+            <div class="notif-preview">
+              <div class="notif-preview-header">
+                <img src="/images/icon.png" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI4IiBmaWxsPSIjMDBhZGVlIi8+PHBhdGggZD0iTTE2IDhDMTMuOCA4IDEyIDkuOCAxMiAxMlYxN0wxMCAxOVYyMEgyMlYxOUwyMCAxN1YxMkMyMCA5LjggMTguMiA4IDE2IDhaTTE2IDI0QzE3LjEgMjQgMTggMjMuMSAxOCAyMkgxNEMxNCAyMy4xIDE0LjkgMjQgMTYgMjRaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg=='" class="notif-preview-icon"/>
+                <div>
+                  <strong id="previewTitle">Your Title Here</strong>
+                  <small>yoursite.com</small>
+                </div>
+              </div>
+              <p id="previewBody" class="notif-preview-body">Your message will appear here...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <div class="card-header"><h3><i class="fas fa-info-circle"></i> Tips</h3></div>
+          <div class="card-body">
+            <ul class="tips-list">
+              <li>🔔 Only subscribed users receive push notifications</li>
+              <li>📝 Keep titles under 50 characters for best display</li>
+              <li>💬 Messages work best under 100 characters</li>
+              <li>🔕 Users without subscriptions are skipped</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const queryType = '<%= typeof query_type !== "undefined" ? query_type : "all" %>';
+  const queryUserId = '<%= typeof query_user_id !== "undefined" ? query_user_id : "" %>';
+
+  function handleTypeChange() {
+    const type = document.querySelector('input[name="send_type"]:checked').value;
+    document.getElementById('individualGroup').style.display = type === 'individual' ? 'block' : 'none';
+    document.getElementById('selectedGroup').style.display = type === 'selected' ? 'block' : 'none';
+  }
+
+  // Live preview
+  document.querySelector('[name="title"]').addEventListener('input', function() {
+    document.getElementById('previewTitle').textContent = this.value || 'Your Title Here';
+  });
+  document.querySelector('[name="body"]').addEventListener('input', function() {
+    document.getElementById('previewBody').textContent = this.value || 'Your message will appear here...';
+  });
+
+  function selectAll() {
+    document.querySelectorAll('#userCheckboxList input[type=checkbox]').forEach(cb => cb.checked = true);
+  }
+  function selectNone() {
+    document.querySelectorAll('#userCheckboxList input[type=checkbox]').forEach(cb => cb.checked = false);
+  }
+  function selectSubscribed() {
+    document.querySelectorAll('#userCheckboxList .user-checkbox-item').forEach(item => {
+      const cb = item.querySelector('input');
+      cb.checked = !item.classList.contains('no-sub');
+    });
+  }
+
+  // Init based on query params
+  handleTypeChange();
+  if (queryType) {
+    const radio = document.querySelector(`input[value="${queryType}"]`);
+    if (radio) { radio.checked = true; handleTypeChange(); }
+  }
+</script>
+</body>
+</html>

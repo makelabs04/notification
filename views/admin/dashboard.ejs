@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title><%= title %> | PushNotify</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+<%- include('../partials/sidebar') %>
+
+<div class="main-content">
+  <%- include('../partials/topbar') %>
+
+  <div class="page-body">
+    <%- include('../partials/flash') %>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#e3f6ff;color:#00adee">
+          <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-info">
+          <div class="stat-number"><%= stats.totalUsers %></div>
+          <div class="stat-label">Total Users</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#e8f5e9;color:#4caf50">
+          <i class="fas fa-bell"></i>
+        </div>
+        <div class="stat-info">
+          <div class="stat-number"><%= stats.subscribedUsers %></div>
+          <div class="stat-label">Subscribed Users</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#fff3e0;color:#ff9800">
+          <i class="fas fa-paper-plane"></i>
+        </div>
+        <div class="stat-info">
+          <div class="stat-number"><%= stats.totalNotifications %></div>
+          <div class="stat-label">Notifications Sent</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#f3e5f5;color:#9c27b0">
+          <i class="fas fa-check-double"></i>
+        </div>
+        <div class="stat-info">
+          <div class="stat-number"><%= stats.totalSent %></div>
+          <div class="stat-label">Delivered</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions + Recent Notifications -->
+    <div class="dashboard-grid">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+        </div>
+        <div class="card-body">
+          <a href="/admin/send-notification?type=all" class="quick-action-btn">
+            <i class="fas fa-globe"></i>
+            <div>
+              <strong>Send to All Users</strong>
+              <small>Broadcast to everyone</small>
+            </div>
+          </a>
+          <a href="/admin/send-notification?type=selected" class="quick-action-btn">
+            <i class="fas fa-user-check"></i>
+            <div>
+              <strong>Send to Selected</strong>
+              <small>Pick specific users</small>
+            </div>
+          </a>
+          <a href="/admin/users" class="quick-action-btn">
+            <i class="fas fa-users-cog"></i>
+            <div>
+              <strong>Manage Users</strong>
+              <small>View & manage all users</small>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fas fa-history"></i> Recent Notifications</h3>
+          <a href="/admin/notifications" class="btn-link">View All</a>
+        </div>
+        <div class="card-body">
+          <% if (notifications.length === 0) { %>
+            <div class="empty-state">
+              <i class="fas fa-bell-slash"></i>
+              <p>No notifications sent yet.</p>
+              <a href="/admin/send-notification" class="btn btn-primary btn-sm">Send First Notification</a>
+            </div>
+          <% } else { %>
+            <% notifications.forEach(n => { %>
+              <div class="notif-item">
+                <div class="notif-icon"><i class="fas fa-bell"></i></div>
+                <div class="notif-content">
+                  <strong><%= n.title %></strong>
+                  <small><%= n.body.substring(0, 60) %><%= n.body.length > 60 ? '...' : '' %></small>
+                  <span class="notif-meta">
+                    <span class="badge badge-<%= n.send_type %>"><%= n.send_type %></span>
+                    <%= new Date(n.created_at).toLocaleDateString() %>
+                  </span>
+                </div>
+              </div>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card mt-4">
+      <div class="card-header">
+        <h3><i class="fas fa-users"></i> Users Overview</h3>
+        <a href="/admin/users" class="btn-link">View All</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Push Status</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.slice(0,5).forEach(u => { %>
+            <tr>
+              <td>
+                <div class="user-cell">
+                  <div class="mini-avatar"><%= u.name.charAt(0) %></div>
+                  <%= u.name %>
+                </div>
+              </td>
+              <td><%= u.email %></td>
+              <td>
+                <span class="badge <%= u.has_subscription > 0 ? 'badge-success' : 'badge-muted' %>">
+                  <i class="fas fa-<%= u.has_subscription > 0 ? 'bell' : 'bell-slash' %>"></i>
+                  <%= u.has_subscription > 0 ? 'Subscribed' : 'Not Subscribed' %>
+                </span>
+              </td>
+              <td>
+                <span class="badge <%= u.is_active ? 'badge-success' : 'badge-danger' %>">
+                  <%= u.is_active ? 'Active' : 'Inactive' %>
+                </span>
+              </td>
+              <td>
+                <a href="/admin/send-notification?type=individual&user_id=<%= u.id %>" class="btn btn-primary btn-xs">
+                  <i class="fas fa-paper-plane"></i> Notify
+                </a>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/admin.js"></script>
+</body>
+</html>
